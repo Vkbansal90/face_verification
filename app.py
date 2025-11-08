@@ -1,8 +1,29 @@
 from flask import Flask, request, jsonify
 from deepface import DeepFace
 import os
+import threading
+import logging
 
 app = Flask(__name__)
+logging.basicConfig(level=logging.INFO)
+
+# --- Preload models on startup in a background thread ---
+def preload_models():
+    try:
+        logging.info("Preloading DeepFace models (this can take a while)...")
+        # Build the face recognition model used by DeepFace (e.g., Facenet)
+        # Change model name if you prefer another model: "VGG-Face", "ArcFace", etc.
+        DeepFace.build_model("Facenet")
+        # Preload detector models indirectly by calling verify with two tiny images if needed,
+        # but DeepFace will load detector lazily on first verify call. The build_model above helps.
+        logging.info("DeepFace models preloaded.")
+    except Exception:
+        logging.exception("Failed to preload DeepFace models.")
+
+# Start preloading in a background thread so app can start quickly
+t = threading.Thread(target=preload_models, daemon=True)
+t.start()
+# ------------------------------------------------------
 
 @app.route('/')
 def home():
@@ -34,4 +55,3 @@ def compare_faces():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
-
